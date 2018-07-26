@@ -113,8 +113,8 @@ AROPTS = -o
 else
 
 GCC      = 1
-CC       = msp430-gcc
-LD       = msp430-gcc
+CC       = msp430-gcc -std=gnu99
+LD       = msp430-gcc -std=gnu99
 AS       = msp430-as
 AR       = msp430-ar
 NM       = msp430-nm
