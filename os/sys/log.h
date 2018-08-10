@@ -145,7 +145,7 @@ extern struct log_module all_modules[];
                          } while (0)
 
 /* More compact versions of LOG macros */
-#define LOG_PRINT(...)         LOG(1, 0, "PRI", __VA_ARGS__)
+#define TORMES_PRINT(...)         LOG(1, 0, "PRI", __VA_ARGS__)
 #define LOG_ERR(...)           LOG(1, LOG_LEVEL_ERR, "ERR", __VA_ARGS__)
 #define LOG_WARN(...)          LOG(1, LOG_LEVEL_WARN, "WARN", __VA_ARGS__)
 #define LOG_INFO(...)          LOG(1, LOG_LEVEL_INFO, "INFO", __VA_ARGS__)

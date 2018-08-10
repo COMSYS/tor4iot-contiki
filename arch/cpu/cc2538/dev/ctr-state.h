@@ -33,6 +33,8 @@ typedef struct aes_ctr_state_ctx {
 
   uint8_t key_len;
   uint8_t key[CTR_STATE_MAXKEYLEN];
+
+  struct pt crypt_pt;
 } aes_ctr_state_ctx;
 
 /*---------------------------------------------------------------------------*/
@@ -43,8 +45,7 @@ typedef struct aes_ctr_state_ctx {
 void
 ctr_state_init(aes_ctr_state_ctx *ctx, uint8_t* key, uint8_t keylen, const uint8_t* iv);
 
-uint8_t
-ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen);
+PT_THREAD(ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen));
 
 /** @} */
 

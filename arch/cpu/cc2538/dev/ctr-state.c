@@ -6,6 +6,7 @@
  * Implementation of the cc2538 AES-CTR-state driver
  */
 #include "contiki.h"
+#include "sys/process.h"
 #include "dev/rom-util.h"
 #include "dev/ctr-state.h"
 
@@ -13,6 +14,13 @@
 #include <stdint.h>
 #include <stdio.h>
 /*---------------------------------------------------------------------------*/
+
+static int8_t
+ctr_state_get_status() {
+  return aes_auth_crypt_check_status() ? aes_auth_crypt_get_result(NULL, NULL) :
+                                           CRYPTO_PENDING;
+}
+
 void
 ctr_state_init(aes_ctr_state_ctx *ctx, uint8_t* key, uint8_t keylen, const uint8_t* iv) {
   ctx->key_len = keylen;
@@ -20,21 +28,23 @@ ctr_state_init(aes_ctr_state_ctx *ctx, uint8_t* key, uint8_t keylen, const uint8
   rom_util_memcpy(ctx->iv, iv, CTR_STATE_IVLEN);
 
   ctx->num = 0;
+
+  PT_INIT(&ctx->crypt_pt);
 }
 
 static uint8_t buf[CTR_STATE_BLOCKLEN];
 
-uint8_t
-ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen)
+PT_THREAD(ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen))
 {
   uint32_t ctrl;
   uint8_t iv[16];
   uint8_t len = datalen;
   uint8_t offset = 0;
-  uint8_t res = 0;
+
+  PT_BEGIN(&ctx->crypt_pt);
 
   /* Load key */
-  res = aes_load_keys(ctx->key, (ctx->key_len == 16) ? AES_KEY_STORE_SIZE_KEY_SIZE_128 : AES_KEY_STORE_SIZE_KEY_SIZE_256, 1, 0);
+  aes_load_keys(ctx->key, (ctx->key_len == 16) ? AES_KEY_STORE_SIZE_KEY_SIZE_128 : AES_KEY_STORE_SIZE_KEY_SIZE_256, 1, 0);
 
   /* Program AES-CTR crypto operation */
   ctrl = (((16 >> 2) - 1) << AES_AES_CTRL_CTR_WIDTH_S) | /* CTR width */
@@ -64,7 +74,7 @@ ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen)
     len -= CTR_STATE_BLOCKLEN-ctx->num;
     offset += ctx->num;
 
-    while (aes_auth_crypt_get_result(NULL, NULL) != CRYPTO_SUCCESS);
+    while(ctr_state_get_status() == CRYPTO_PENDING);
 
     rom_util_memcpy(data, buf+ctx->num, CTR_STATE_BLOCKLEN-ctx->num);
 
@@ -80,7 +90,7 @@ ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen)
   if (len > 0) {
     aes_auth_crypt_start(ctrl, 0, iv, NULL, 0, data+offset, data+offset, len, NULL);
 
-    while (aes_auth_crypt_get_result(NULL, NULL) != CRYPTO_SUCCESS);
+    while(ctr_state_get_status() == CRYPTO_PENDING);
 
     ((uint32_t *)ctx->iv)[0] = REG(AES_AES_IV_0);
     ((uint32_t *)ctx->iv)[1] = REG(AES_AES_IV_1);
@@ -93,7 +103,7 @@ ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen)
 
   ctx->num = len % CTR_STATE_BLOCKLEN;
 
-  return res;
+  PT_END(&ctx->crypt_pt);
 }
 /*---------------------------------------------------------------------------*/
 
