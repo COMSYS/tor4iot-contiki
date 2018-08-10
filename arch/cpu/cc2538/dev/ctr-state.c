@@ -28,20 +28,16 @@ ctr_state_init(aes_ctr_state_ctx *ctx, uint8_t* key, uint8_t keylen, const uint8
   rom_util_memcpy(ctx->iv, iv, CTR_STATE_IVLEN);
 
   ctx->num = 0;
-
-  PT_INIT(&ctx->crypt_pt);
 }
 
 static uint8_t buf[CTR_STATE_BLOCKLEN];
 
-PT_THREAD(ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen))
+void ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen)
 {
   uint32_t ctrl;
   uint8_t iv[16];
   uint8_t len = datalen;
   uint8_t offset = 0;
-
-  PT_BEGIN(&ctx->crypt_pt);
 
   /* Load key */
   aes_load_keys(ctx->key, (ctx->key_len == 16) ? AES_KEY_STORE_SIZE_KEY_SIZE_128 : AES_KEY_STORE_SIZE_KEY_SIZE_256, 1, 0);
@@ -103,7 +99,6 @@ PT_THREAD(ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen
 
   ctx->num = len % CTR_STATE_BLOCKLEN;
 
-  PT_END(&ctx->crypt_pt);
 }
 /*---------------------------------------------------------------------------*/
 
