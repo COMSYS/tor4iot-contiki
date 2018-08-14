@@ -38,6 +38,8 @@
 #define MODE_SLIP_AUTO   6
 #define MODE_SLIP        7
 #define MODE_SLIP_HIDE   8
+#define MODE_MY_DATE_ST  9
+#define MODE_MY_DATE    10
 
 static unsigned char rxbuf[2048];
 
@@ -52,6 +54,8 @@ usage(int result)
   printf("       -sn to hide SLIP packages\n");
   printf("       -T[format] to add time for each text line\n");
   printf("         (see man page for strftime() for format description)\n");
+  printf("       -t to add time for each line using XXXsXXXns format.\n");
+  printf("         clock_gettime with CLOCK_REALTIME is used.\n");
   return result;
 }
 
@@ -159,6 +163,9 @@ main(int argc, char **argv)
           break;
         case 'h':
           return usage(0);
+        case 't':
+          mode = MODE_MY_DATE_ST;
+          break;
         default:
           fprintf(stderr, "unknown option '%c'\n", argv[index][1]);
           return usage(1);
@@ -314,6 +321,18 @@ main(int argc, char **argv)
             printf("%c", buf[i]);
             if(buf[i] == '\n') {
               mode = MODE_START_DATE;
+            }
+            break;
+          case MODE_MY_DATE_ST: {
+            struct timespec t;
+            clock_gettime(CLOCK_REALTIME, &t);
+            printf("%lus%luns|", t.tv_sec, t.tv_nsec);
+            mode = MODE_MY_DATE;
+          }
+          case MODE_MY_DATE:
+            printf("%c", buf[i]);
+            if(buf[i] == '\n') {
+              mode = MODE_MY_DATE_ST;
             }
             break;
           case MODE_INT:

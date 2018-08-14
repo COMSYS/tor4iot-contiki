@@ -47,6 +47,7 @@
 #include <unistd.h>
 #include <sys/select.h>
 #include <errno.h>
+#include <time.h>
 
 #ifdef __CYGWIN__
 #include "net/wpcap-drv.h"
@@ -264,6 +265,7 @@ platform_init_stage_two()
 void
 platform_init_stage_three()
 {
+  struct timespec t;
 #if NETSTACK_CONF_WITH_IPV6
 #ifdef __CYGWIN__
   process_start(&wpcap_process, NULL);
@@ -275,6 +277,9 @@ platform_init_stage_three()
 
   /* Make standard output unbuffered. */
   setvbuf(stdout, (char *)NULL, _IONBF, 0);
+
+  clock_gettime(CLOCK_REALTIME, &t);
+  printf("%lus%luns|SYNC:%"PRIu64":%"PRIu64"\n", t.tv_sec, t.tv_nsec, (uint64_t)clock_time(), (uint64_t)RTIMER_NOW());
 }
 /*---------------------------------------------------------------------------*/
 void
