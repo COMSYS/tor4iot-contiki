@@ -7,6 +7,7 @@ OBJDUMP  = arm-none-eabi-objdump
 NM       = arm-none-eabi-nm
 SIZE     = arm-none-eabi-size
 SREC_CAT = srec_cat
+AS       = arm-none-eabi-as
 
 CFLAGS += -mthumb -mabi=aapcs -mlittle-endian
 CFLAGS += -Werror -Wall
