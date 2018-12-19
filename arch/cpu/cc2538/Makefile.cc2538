@@ -10,8 +10,10 @@ ifdef NODEID
   CFLAGS += -DIEEE_ADDR_NODE_ID=$(NODEID)
 endif
 
+CONTIKI_C25519_SOURCEFILES = cortex_m0_mpy121666.s cortex_m0_reduce25519.s mul.s scalarmult.c sqr.s
+
 ### CPU-dependent directories
-CONTIKI_CPU_DIRS = . dev usb usb/common usb/common/cdc-acm
+CONTIKI_CPU_DIRS = . dev usb usb/common usb/common/cdc-acm microsalt
 
 ### CPU-dependent source files
 CONTIKI_CPU_SOURCEFILES += soc.c clock.c rtimer-arch.c uart.c watchdog.c
@@ -33,7 +35,7 @@ USB_SOURCEFILES += usb-core.c cdc-acm.c usb-arch.c usb-serial.c cdc-acm-descript
 
 CPU_START_SOURCEFILES = startup-gcc.c
 
-CONTIKI_SOURCEFILES += $(CONTIKI_CPU_SOURCEFILES) $(DEBUG_IO_SOURCEFILES)
+CONTIKI_SOURCEFILES += $(CONTIKI_CPU_SOURCEFILES) $(DEBUG_IO_SOURCEFILES) $(CONTIKI_C25519_SOURCEFILES)
 CONTIKI_SOURCEFILES += $(USB_SOURCEFILES)
 
 ### Always re-build ieee-addr.o in case the command line passes a new NODEID
