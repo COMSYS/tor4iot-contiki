@@ -126,6 +126,27 @@ int rpl_is_reachable(void);
  */
 int rpl_lollipop_greater_than(int a, int b);
 
+/**
+ * Triggers a route fresh via DTSN increment
+ *
+ * \param str a textual description of the cause for refresh
+ */
+void rpl_refresh_routes(const char *str);
+
+/**
+ * Changes the value of the rpl_leaf_only flag, which determines if a node acts
+ * only as a leaf in the network
+ *
+ * \param value the value to set: 0-disable, 1-enable
+ */
+void rpl_set_leaf_only(uint8_t value);
+
+/**
+ * Get the value of the rpl_leaf_only flag
+ *
+ * \return The value of the rpl_leaf_only flag
+ */
+uint8_t rpl_get_leaf_only(void);
  /** @} */
 
 #endif /* RPL_H */

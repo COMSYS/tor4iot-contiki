@@ -82,7 +82,7 @@ typedef uint8_t gpio_hal_pin_t;
  * A logical representation of a pin's configuration. It is an OR combination
  * of GPIO_HAL_PIN_CFG_xyz macros.
  */
-typedef uint8_t gpio_hal_pin_cfg_t;
+typedef uint32_t gpio_hal_pin_cfg_t;
 
 #ifdef GPIO_HAL_CONF_PIN_COUNT
 #define GPIO_HAL_PIN_COUNT GPIO_HAL_CONF_PIN_COUNT
@@ -107,6 +107,8 @@ typedef void (*gpio_hal_callback_t)(gpio_hal_pin_mask_t pin_mask);
 #define GPIO_HAL_PIN_CFG_PULL_MASK        (GPIO_HAL_PIN_CFG_PULL_UP | \
                                            GPIO_HAL_PIN_CFG_PULL_DOWN)
 
+#define GPIO_HAL_PIN_CFG_HYSTERESIS       0x10
+
 #define GPIO_HAL_PIN_CFG_EDGE_NONE        0x00
 #define GPIO_HAL_PIN_CFG_EDGE_RISING      0x04
 #define GPIO_HAL_PIN_CFG_EDGE_FALLING     0x08
@@ -129,6 +131,13 @@ typedef struct gpio_hal_event_handler_s {
   gpio_hal_callback_t handler;
   gpio_hal_pin_mask_t pin_mask;
 } gpio_hal_event_handler_t;
+/*---------------------------------------------------------------------------*/
+/**
+ * \brief Unknown GPIO
+ *
+ * A default GPIO value for unknown GPIO
+ */
+#define GPIO_HAL_PIN_UNKNOWN              0xFF
 /*---------------------------------------------------------------------------*/
 /**
  * \name Core GPIO functions
@@ -180,7 +189,7 @@ void gpio_hal_event_handler(gpio_hal_pin_mask_t pins);
  * \param pin The pin
  * \return The corresponding mask
  */
-#define gpio_hal_pin_to_mask(pin) (1 << (pin))
+#define gpio_hal_pin_to_mask(pin) ((gpio_hal_pin_mask_t)1 << (pin))
 /** @} */
 /*---------------------------------------------------------------------------*/
 /**
@@ -225,6 +234,18 @@ void gpio_hal_event_handler(gpio_hal_pin_mask_t pins);
 #ifdef GPIO_HAL_CONF_ARCH_HDR_PATH
 #include GPIO_HAL_CONF_ARCH_HDR_PATH
 #endif /* GPIO_HAL_CONF_ARCH_HDR_PATH */
+/*---------------------------------------------------------------------------*/
+#ifndef gpio_hal_arch_init
+/**
+ * \brief Perform architecture specific gpio initaliaztion
+ *
+ * It is the platform developer's responsibility to provide an implementation.
+ *
+ * The implementation can be provided as a global symbol, an inline function
+ * or a function-like macro, as described above.
+ */
+void gpio_hal_arch_init(void);
+#endif
 /*---------------------------------------------------------------------------*/
 #ifndef gpio_hal_arch_interrupt_enable
 /**

@@ -44,10 +44,8 @@
 */
 
 #include "net/mac/tsch/tsch.h"
-#include "net/mac/tsch/tsch-conf.h"
-#include "net/mac/tsch/tsch-adaptive-timesync.h"
-#include "net/mac/tsch/tsch-log.h"
 #include <stdio.h>
+#include <inttypes.h>
 
 #if TSCH_ADAPTIVE_TIMESYNC
 
@@ -112,7 +110,9 @@ timesync_learn_drift_ticks(uint32_t time_delta_asn, int32_t drift_ticks)
 
   TSCH_LOG_ADD(tsch_log_message,
       snprintf(log->message, sizeof(log->message),
-          "drift %ld", tsch_adaptive_timesync_get_drift_ppm()));
+          "drift %ld ppm (min/max delta seen: %"PRId32"/%"PRId32")",
+          tsch_adaptive_timesync_get_drift_ppm(),
+          min_drift_seen, max_drift_seen));
 }
 /*---------------------------------------------------------------------------*/
 /* Either reset or update the neighbor's drift */
@@ -139,6 +139,8 @@ tsch_timesync_update(struct tsch_neighbor *n, uint16_t time_delta_asn, int32_t d
       compensated_ticks += drift_correction;
     }
   }
+  min_drift_seen = MIN(drift_correction, min_drift_seen);
+  max_drift_seen = MAX(drift_correction, max_drift_seen);
 }
 /*---------------------------------------------------------------------------*/
 /* Error-accumulation free compensation algorithm */

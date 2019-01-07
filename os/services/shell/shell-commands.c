@@ -45,6 +45,7 @@
 #include "contiki.h"
 #include "shell.h"
 #include "shell-commands.h"
+#include "lib/list.h"
 #include "sys/log.h"
 #include "dev/watchdog.h"
 #include "net/ipv6/uip.h"
@@ -53,11 +54,10 @@
 #include "net/ipv6/uip-ds6.h"
 #if MAC_CONF_WITH_TSCH
 #include "net/mac/tsch/tsch.h"
-#include "net/mac/tsch/tsch-adaptive-timesync.h"
-#include "net/mac/tsch/tsch-queue.h"
-#include "net/mac/tsch/tsch-log.h"
-#include "net/mac/tsch/tsch-private.h"
 #endif /* MAC_CONF_WITH_TSCH */
+#if MAC_CONF_WITH_CSMA
+#include "net/mac/csma/csma.h"
+#endif
 #include "net/routing/routing.h"
 #include "net/mac/llsec802154.h"
 
@@ -80,7 +80,8 @@ static uint16_t curr_ping_datalen;
 #if TSCH_WITH_SIXTOP
 static shell_command_6top_sub_cmd_t sixtop_sub_cmd = NULL;
 #endif /* TSCH_WITH_SIXTOP */
-
+static struct shell_command_set_t builtin_shell_command_set;
+LIST(shell_command_sets);
 /*---------------------------------------------------------------------------*/
 static const char *
 ds6_nbr_state_to_str(uint8_t state)
@@ -150,6 +151,27 @@ rpl_ocp_to_str(int ocp)
 }
 /*---------------------------------------------------------------------------*/
 static
+PT_THREAD(cmd_rpl_nbr(struct pt *pt, shell_output_func output, char *args))
+{
+  PT_BEGIN(pt);
+
+  if(!curr_instance.used || rpl_neighbor_count() == 0) {
+    SHELL_OUTPUT(output, "RPL neighbors: none\n");
+  } else {
+    rpl_nbr_t *nbr = nbr_table_head(rpl_neighbors);
+    SHELL_OUTPUT(output, "RPL neighbors:\n");
+    while(nbr != NULL) {
+      char buf[120];
+      rpl_neighbor_snprint(buf, sizeof(buf), nbr);
+      SHELL_OUTPUT(output, "%s\n", buf);
+      nbr = nbr_table_next(rpl_neighbors, nbr);
+    }
+  }
+
+  PT_END(pt);
+}
+/*---------------------------------------------------------------------------*/
+static
 PT_THREAD(cmd_rpl_status(struct pt *pt, shell_output_func output, char *args))
 {
   PT_BEGIN(pt);
@@ -177,8 +199,12 @@ PT_THREAD(cmd_rpl_status(struct pt *pt, shell_output_func output, char *args))
 
     SHELL_OUTPUT(output, "-- State: %s\n", rpl_state_to_str(curr_instance.dag.state));
     SHELL_OUTPUT(output, "-- Preferred parent: ");
-    shell_output_6addr(output, rpl_neighbor_get_ipaddr(curr_instance.dag.preferred_parent));
-    SHELL_OUTPUT(output, "\n");
+    if(curr_instance.dag.preferred_parent) {
+      shell_output_6addr(output, rpl_neighbor_get_ipaddr(curr_instance.dag.preferred_parent));
+      SHELL_OUTPUT(output, " (last DTSN: %u)\n", curr_instance.dag.preferred_parent->dtsn);
+    } else {
+      SHELL_OUTPUT(output, "None\n");
+    }
     SHELL_OUTPUT(output, "-- Rank: %u\n", curr_instance.dag.rank);
     SHELL_OUTPUT(output, "-- Lowest rank: %u (%u)\n", curr_instance.dag.lowest_rank, curr_instance.max_rankinc);
     SHELL_OUTPUT(output, "-- DTSN out: %u\n", curr_instance.dtsn_out);
@@ -324,15 +350,16 @@ PT_THREAD(cmd_log(struct pt *pt, shell_output_func output, char *args))
 static
 PT_THREAD(cmd_help(struct pt *pt, shell_output_func output, char *args))
 {
-  struct shell_command_t *cmd_ptr;
-
+  struct shell_command_set_t *set;
+  const struct shell_command_t *cmd;
   PT_BEGIN(pt);
 
   SHELL_OUTPUT(output, "Available commands:\n");
-  cmd_ptr = shell_commands;
-  while(cmd_ptr->name != NULL) {
-    SHELL_OUTPUT(output, "%s\n", cmd_ptr->help);
-    cmd_ptr++;
+  /* Note: we explicitly don't expend any code space to deal with shadowing */
+  for(set = list_head(shell_command_sets); set != NULL; set = list_item_next(set)) {
+    for(cmd = set->commands; cmd->name != NULL; ++cmd) {
+      SHELL_OUTPUT(output, "%s\n", cmd->help);
+    }
   }
 
   PT_END(pt);
@@ -400,7 +427,7 @@ PT_THREAD(cmd_rpl_global_repair(struct pt *pt, shell_output_func output, char *a
 {
   PT_BEGIN(pt);
 
-  SHELL_OUTPUT(output, "Triggering routing global repair\n")
+  SHELL_OUTPUT(output, "Triggering routing global repair\n");
   NETSTACK_ROUTING.global_repair("Shell");
 
   PT_END(pt);
@@ -416,6 +443,19 @@ PT_THREAD(cmd_rpl_local_repair(struct pt *pt, shell_output_func output, char *ar
 
   PT_END(pt);
 }
+/*---------------------------------------------------------------------------*/
+#if ROUTING_CONF_RPL_LITE
+static
+PT_THREAD(cmd_rpl_refresh_routes(struct pt *pt, shell_output_func output, char *args))
+{
+  PT_BEGIN(pt);
+
+  SHELL_OUTPUT(output, "Triggering routes refresh\n");
+  rpl_refresh_routes("Shell");
+
+  PT_END(pt);
+}
+#endif /* ROUTING_CONF_RPL_LITE */
 #endif /* UIP_CONF_IPV6_RPL */
 /*---------------------------------------------------------------------------*/
 static
@@ -581,24 +621,9 @@ PT_THREAD(cmd_routes(struct pt *pt, shell_output_func output, char *args))
     SHELL_OUTPUT(output, "Routing links (%u in total):\n", uip_sr_num_nodes());
     link = uip_sr_node_head();
     while(link != NULL) {
-      uip_ipaddr_t child_ipaddr;
-      uip_ipaddr_t parent_ipaddr;
-      NETSTACK_ROUTING.get_sr_node_ipaddr(&child_ipaddr, link);
-      NETSTACK_ROUTING.get_sr_node_ipaddr(&parent_ipaddr, link->parent);
-      SHELL_OUTPUT(output, "-- ");
-      shell_output_6addr(output, &child_ipaddr);
-      if(link->parent == NULL) {
-        memset(&parent_ipaddr, 0, sizeof(parent_ipaddr));
-        SHELL_OUTPUT(output, " (DODAG root)");
-      } else {
-        SHELL_OUTPUT(output, " to ");
-        shell_output_6addr(output, &parent_ipaddr);
-      }
-      if(link->lifetime != UIP_SR_INFINITE_LIFETIME) {
-        SHELL_OUTPUT(output, " (lifetime: %lu seconds)\n", (unsigned long)link->lifetime);
-      } else {
-        SHELL_OUTPUT(output, " (lifetime: infinite)\n");
-      }
+      char buf[100];
+      uip_sr_link_snprint(buf, sizeof(buf), link);
+      SHELL_OUTPUT(output, "-- %s\n", buf);
       link = uip_sr_node_next(link);
     }
   } else {
@@ -707,15 +732,118 @@ PT_THREAD(cmd_6top(struct pt *pt, shell_output_func output, char *args))
 }
 #endif /* TSCH_WITH_SIXTOP */
 /*---------------------------------------------------------------------------*/
+#if LLSEC802154_ENABLED
+static
+PT_THREAD(cmd_llsec_setlv(struct pt *pt, shell_output_func output, char *args))
+{
+
+  PT_BEGIN(pt);
+
+  if(args == NULL) {
+    SHELL_OUTPUT(output, "Default LLSEC level is %d\n",
+                 uipbuf_get_attr(UIPBUF_ATTR_LLSEC_LEVEL));
+    PT_EXIT(pt);
+  } else {
+    int lv = atoi(args);
+    if(lv < 0 || lv > 7) {
+      SHELL_OUTPUT(output, "Illegal LLSEC Level %d\n", lv);
+      PT_EXIT(pt);
+    } else {
+      uipbuf_set_default_attr(UIPBUF_ATTR_LLSEC_LEVEL, lv);
+      uipbuf_clear_attr();
+      SHELL_OUTPUT(output, "LLSEC default level set %d\n", lv);
+    }
+  }
+
+  PT_END(pt);
+}
+/*---------------------------------------------------------------------------*/
+static
+PT_THREAD(cmd_llsec_setkey(struct pt *pt, shell_output_func output, char *args))
+{
+  char *next_args;
+
+  PT_BEGIN(pt);
+
+  SHELL_ARGS_INIT(args, next_args);
+
+  if(args == NULL) {
+    SHELL_OUTPUT(output, "Provide an index and a 16-char string for the key\n");
+    PT_EXIT(pt);
+  } else {
+    int key;
+    SHELL_ARGS_NEXT(args, next_args);
+    key = atoi(args);
+    if(key < 0) {
+      SHELL_OUTPUT(output, "Illegal LLSEC Key index %d\n", key);
+      PT_EXIT(pt);
+    } else {
+#if MAC_CONF_WITH_CSMA
+      /* Get next arg (key-string) */
+      SHELL_ARGS_NEXT(args, next_args);
+      if(args == NULL) {
+        SHELL_OUTPUT(output, "Provide both an index and a key\n");
+      } else if(strlen(args) == 16) {
+        csma_security_set_key(key, (const uint8_t *) args);
+        SHELL_OUTPUT(output, "Set key for index %d\n", key);
+      } else {
+        SHELL_OUTPUT(output, "Wrong length of key: '%s' (%d)\n", args, strlen(args));
+      }
+#else
+      SHELL_OUTPUT(output, "Set key not supported.\n");
+      PT_EXIT(pt);
+#endif
+    }
+  }
+  PT_END(pt);
+}
+#endif /* LLSEC802154_ENABLED */
+/*---------------------------------------------------------------------------*/
 void
 shell_commands_init(void)
 {
+  list_init(shell_command_sets);
+  list_add(shell_command_sets, &builtin_shell_command_set);
   /* Set up Ping Reply callback */
   uip_icmp6_echo_reply_callback_add(&echo_reply_notification,
                                     echo_reply_handler);
 }
 /*---------------------------------------------------------------------------*/
-struct shell_command_t shell_commands[] = {
+void
+shell_command_set_register(struct shell_command_set_t *set)
+{
+  list_push(shell_command_sets, set);
+}
+/*---------------------------------------------------------------------------*/
+int
+shell_command_set_deregister(struct shell_command_set_t *set)
+{
+  if(!list_contains(shell_command_sets, set)) {
+    return !0;
+  }
+  list_remove(shell_command_sets, set);
+  return 0;
+}
+/*---------------------------------------------------------------------------*/
+const struct shell_command_t *
+shell_command_lookup(const char *name)
+{
+  struct shell_command_set_t *set;
+  const struct shell_command_t *cmd;
+
+  for(set = list_head(shell_command_sets);
+      set != NULL;
+      set = list_item_next(set)) {
+    for(cmd = set->commands; cmd->name != NULL; ++cmd) {
+      if(!strcmp(cmd->name, name)) {
+        return cmd;
+      }
+    }
+  }
+  return NULL;
+}
+/*---------------------------------------------------------------------------*/
+const struct shell_command_t builtin_shell_commands[] = {
   { "help",                 cmd_help,                 "'> help': Shows this help" },
   { "reboot",               cmd_reboot,               "'> reboot': Reboot the board by watchdog_reboot()" },
   { "ip-addr",              cmd_ipaddr,               "'> ip-addr': Shows all IPv6 addresses" },
@@ -725,10 +853,14 @@ struct shell_command_t shell_commands[] = {
 #if UIP_CONF_IPV6_RPL
   { "rpl-set-root",         cmd_rpl_set_root,         "'> rpl-set-root 0/1 [prefix]': Sets node as root (1) or not (0). A /64 prefix can be optionally specified." },
   { "rpl-local-repair",     cmd_rpl_local_repair,     "'> rpl-local-repair': Triggers a RPL local repair" },
+#if ROUTING_CONF_RPL_LITE
+  { "rpl-refresh-routes",   cmd_rpl_refresh_routes,   "'> rpl-refresh-routes': Refreshes all routes through a DTSN increment" },
+#endif /* ROUTING_CONF_RPL_LITE */
   { "rpl-global-repair",    cmd_rpl_global_repair,    "'> rpl-global-repair': Triggers a RPL global repair" },
 #endif /* UIP_CONF_IPV6_RPL */
 #if ROUTING_CONF_RPL_LITE
   { "rpl-status",           cmd_rpl_status,           "'> rpl-status': Shows a summary of the current RPL state" },
+  { "rpl-nbr",              cmd_rpl_nbr,              "'> rpl-nbr': Shows the RPL neighbor table" },
 #endif /* ROUTING_CONF_RPL_LITE */
   { "routes",               cmd_routes,               "'> routes': Shows the route entries" },
 #if MAC_CONF_WITH_TSCH
@@ -739,7 +871,15 @@ struct shell_command_t shell_commands[] = {
 #if TSCH_WITH_SIXTOP
   { "6top",                 cmd_6top,                 "'> 6top help': Shows 6top command usage" },
 #endif /* TSCH_WITH_SIXTOP */
+#if LLSEC802154_ENABLED
+  { "llsec-set-level", cmd_llsec_setlv, "'> llsec-set-level <lv>': Set the level of link layer security (show if no lv argument)"},
+  { "llsec-set-key", cmd_llsec_setkey, "'> llsec-set-key <id> <key>': Set the key of link layer security"},
+#endif /* LLSEC802154_ENABLED */
   { NULL, NULL, NULL },
 };
 
+static struct shell_command_set_t builtin_shell_command_set = {
+  .next = NULL,
+  .commands = builtin_shell_commands,
+};
 /** @} */
