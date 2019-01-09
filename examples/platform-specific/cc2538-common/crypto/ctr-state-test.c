@@ -90,7 +90,7 @@ PROCESS_THREAD(ctr_test_process, ev, data)
   puts("-----------------------------------------\n"
        "Initializing cryptoprocessor...");
   crypto_init();
-  random_init();
+  random_init(123456);
 
   puts("Testing AES-128 CTR now... ");
 
@@ -153,7 +153,7 @@ PROCESS_THREAD(ctr_test_process, ev, data)
   puts("OK!\n");
 
 
-  puts("We are in STAGE 2 now. Encrypting and decrypting 1024 byte.\n")
+  puts("We are in STAGE 2 now. Encrypting and decrypting 1024 byte.\n");
 
   memset(&ctx, 0, sizeof(aes_ctr_state_ctx));
   ctr_state_init(&ctx, test_key_256, 32, test_iv);

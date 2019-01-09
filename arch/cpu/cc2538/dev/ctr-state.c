@@ -32,11 +32,11 @@ ctr_state_init(aes_ctr_state_ctx *ctx, uint8_t* key, uint8_t keylen, const uint8
 
 static uint8_t buf[CTR_STATE_BLOCKLEN];
 
-void ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen)
+void ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint16_t datalen)
 {
   uint32_t ctrl;
   uint8_t iv[16];
-  uint8_t len = datalen;
+  uint16_t len = datalen;
   uint8_t offset = 0;
 
   /* Load key */
