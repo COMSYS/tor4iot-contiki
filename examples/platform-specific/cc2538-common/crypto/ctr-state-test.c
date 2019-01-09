@@ -90,7 +90,7 @@ PROCESS_THREAD(ctr_test_process, ev, data)
   puts("-----------------------------------------\n"
        "Initializing cryptoprocessor...");
   crypto_init();
-  random_init(123456);
+  random_init(12345);
 
   puts("Testing AES-128 CTR now... ");
 
