@@ -44,7 +44,7 @@ void
 ctr_state_init(aes_ctr_state_ctx *ctx, uint8_t* key, uint8_t keylen, const uint8_t* iv);
 
 void
-ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint8_t datalen);
+ctr_state_crypt(aes_ctr_state_ctx *ctx, uint8_t *data, uint16_t datalen);
 
 /** @} */
 
