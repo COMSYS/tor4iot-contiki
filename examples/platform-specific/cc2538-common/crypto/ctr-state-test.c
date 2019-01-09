@@ -158,9 +158,13 @@ PROCESS_THREAD(ctr_test_process, ev, data)
   memset(&ctx, 0, sizeof(aes_ctr_state_ctx));
   ctr_state_init(&ctx, test_key_256, 32, test_iv);
 
-  for (uint8_t i=0; i<512; i++) {
+  puts("Generating random plain data.. ");
+
+  for (uint16_t i=0; i<512; i++) {
 	  ((uint16_t*) plain)[i] = random_rand();
   }
+
+  puts(" done.\n");
 
   memcpy(buffer, plain, 1024);
 
@@ -173,7 +177,7 @@ PROCESS_THREAD(ctr_test_process, ev, data)
   ctr_state_crypt(&ctx, buffer, 512);
   ctr_state_crypt(&ctx, buffer+512, 512);
 
-  for (uint8_t i=0; i<1024; i++) {
+  for (uint16_t i=0; i<1024; i++) {
     if (buffer[i] != plain[i]) {
       printf("0x%02x : 0x%02x\n", buffer[i], plain[i]);
       puts("FAILED!\n");

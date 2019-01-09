@@ -24,4 +24,5 @@ Engage with the community:
 # Changes
 
 * We enabled support for the OpenMote-B in a current Contiki-NG branch by merging the forked project back into the original one
-* We started to support AES in CTR mode with state as used by OpenSSL and Tor (still not working) 
+* We started to support AES in CTR mode with state as used by OpenSSL and Tor
+* We enabled the usage of our tinyDTLS [Repo](https://laboratory.comsys.rwth-aachen.de/dahlmanns/tinydtls)
