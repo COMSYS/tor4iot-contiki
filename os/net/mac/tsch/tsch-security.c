@@ -44,11 +44,6 @@
 
 #include "contiki.h"
 #include "net/mac/tsch/tsch.h"
-#include "net/mac/tsch/tsch-packet.h"
-#include "net/mac/tsch/tsch-private.h"
-#include "net/mac/tsch/tsch-schedule.h"
-#include "net/mac/tsch/tsch-security.h"
-#include "net/mac/tsch/tsch-log.h"
 #include "net/mac/framer/frame802154.h"
 #include "net/mac/framer/framer-802154.h"
 #include "net/netstack.h"
@@ -57,6 +52,10 @@
 #include "lib/aes-128.h"
 #include <stdio.h>
 #include <string.h>
+
+#if LLSEC802154_ENABLED && !LLSEC802154_USES_EXPLICIT_KEYS
+#error LLSEC802154_ENABLED set but LLSEC802154_USES_EXPLICIT_KEYS unset
+#endif /* LLSEC802154_ENABLED */
 
 /* The two keys K1 and K2 from 6TiSCH minimal configuration
  * K1: well-known, used for EBs

@@ -57,6 +57,9 @@
 #include "net/netstack.h"
 
 #include "dev/serial-line.h"
+#include "dev/button-hal.h"
+#include "dev/gpio-hal.h"
+#include "dev/leds.h"
 
 #include "net/ipv6/uip.h"
 #include "net/ipv6/uip-debug.h"
@@ -118,9 +121,6 @@ static uint8_t mac_addr[] = PLATFORM_CONF_MAC_ADDR;
 static uint8_t mac_addr[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
 #endif /* PLATFORM_CONF_MAC_ADDR */
 
-#if !NETSTACK_CONF_WITH_IPV6
-static uint16_t node_id = 0x0102;
-#endif /* !NETSTACK_CONF_WITH_IPV6 */
 /*---------------------------------------------------------------------------*/
 int
 select_set_callback(int fd, const struct select_callback *callback)
@@ -185,14 +185,9 @@ set_lladdr(void)
 #if NETSTACK_CONF_WITH_IPV6
   memcpy(addr.u8, mac_addr, sizeof(addr.u8));
 #else
-  if(node_id == 0) {
-    int i;
-    for(i = 0; i < sizeof(linkaddr_t); ++i) {
-      addr.u8[i] = mac_addr[7 - i];
-    }
-  } else {
-    addr.u8[0] = node_id & 0xff;
-    addr.u8[1] = node_id >> 8;
+  int i;
+  for(i = 0; i < sizeof(linkaddr_t); ++i) {
+    addr.u8[i] = mac_addr[7 - i];
   }
 #endif
   linkaddr_set_node_addr(&addr);
@@ -252,6 +247,9 @@ platform_process_args(int argc, char**argv)
 void
 platform_init_stage_one()
 {
+  gpio_hal_init();
+  button_hal_init();
+  leds_init();
   return;
 }
 /*---------------------------------------------------------------------------*/

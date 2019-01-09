@@ -47,6 +47,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include "sys/cc.h"
 
 #include "coap.h"
@@ -1115,13 +1116,10 @@ coap_set_header_size1(coap_message_t *coap_pkt, uint32_t size)
 int
 coap_get_payload(coap_message_t *coap_pkt, const uint8_t **payload)
 {
-  if(coap_pkt->payload) {
+  if(payload != NULL) {
     *payload = coap_pkt->payload;
-    return coap_pkt->payload_len;
-  } else {
-    *payload = NULL;
-    return 0;
   }
+  return coap_pkt->payload != NULL ? coap_pkt->payload_len : 0;
 }
 int
 coap_set_payload(coap_message_t *coap_pkt, const void *payload, size_t length)
