@@ -66,7 +66,7 @@ cfs_readdir(struct cfs_dir *p, struct cfs_dirent *e)
   if(res == NULL) {
     return -1;
   }
-  strncpy(e->name, res->d_name, sizeof(e->name));
+  memcpy(e->name, res->d_name, sizeof(e->name));
 #if defined(__APPLE2__) || defined(__CBM__)
   e->size = res->d_blocks;
 #else /* __APPLE2__ || __CBM__ */
