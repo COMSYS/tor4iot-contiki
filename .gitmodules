@@ -18,7 +18,7 @@
 	url = https://github.com/contiki-ng/example-lwm2m-standalone.git
 [submodule "os/net/security/tinydtls"]
 	path = os/net/security/tinydtls
-	url = https://laboratory.comsys.rwth-aachen.de/dahlmanns/tinydtls.git
+	url = git@laboratory.comsys.rwth-aachen.de:dahlmanns/tinydtls.git
 [submodule "tools/motelist"]
 	path = tools/motelist
 	url = https://github.com/contiki-ng/motelist
